@@ -77,7 +77,11 @@ describe('TriageService', () => {
       result: {
         message: 'Test alert message',
         report: { test: 'report data' },
-        transaction: { test: 'transaction data' },
+        transaction: { 
+          tenantId: 'test-tenant-id',
+          txTp: 'PAYMENT',
+          test: 'transaction data' 
+        },
         networkMap: { test: 'network data' },
         source: 'test-source',
       },
@@ -234,7 +238,11 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT',
+            test: 'transaction' 
+          },
           networkMap: { test: 'network' },
           source: 'direct-source',
         },
@@ -271,7 +279,11 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { source: 'report-source' },
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT',
+            test: 'transaction' 
+          },
           networkMap: { test: 'network' },
           source: '', // empty string, should fallback to report
         },
@@ -308,7 +320,11 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { test: 'data' }, // no source property
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT',
+            test: 'transaction' 
+          },
           networkMap: { test: 'network' },
           source: '', // empty source
         },
@@ -347,7 +363,10 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { txtp: 'report-txtp' },
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT'
+          },
           networkMap: { test: 'network' },
           source: 'test-source',
         },
@@ -373,7 +392,7 @@ describe('TriageService', () => {
 
       expect(prismaService.alert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          txtp: 'report-txtp',
+          txtp: 'PAYMENT', // TAZAMA: txTp is now extracted from transaction object
         }),
       });
       expect(result).toEqual(mockAlert);
@@ -384,7 +403,10 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
-          transaction: { txtp: 'transaction-txtp' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'transaction-txtp'
+          },
           networkMap: { test: 'network' },
           source: 'test-source',
         },
@@ -410,7 +432,7 @@ describe('TriageService', () => {
 
       expect(prismaService.alert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          txtp: 'transaction-txtp',
+          txtp: 'transaction-txtp', // TAZAMA: txTp is extracted from transaction object
         }),
       });
       expect(result).toEqual(mockAlert);
@@ -421,7 +443,10 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT'
+          },
           networkMap: { txtp: 'network-txtp' },
           source: 'test-source',
         },
@@ -447,7 +472,7 @@ describe('TriageService', () => {
 
       expect(prismaService.alert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          txtp: 'network-txtp',
+          txtp: 'PAYMENT', // TAZAMA: txTp is now extracted from transaction object
         }),
       });
       expect(result).toEqual(mockAlert);
@@ -460,7 +485,10 @@ describe('TriageService', () => {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
-          transaction: { test: 'transaction' },
+          transaction: { 
+            tenantId: 'tenant-123',
+            txTp: 'PAYMENT'
+          },
           networkMap: { test: 'network' },
           source: 'test-source',
         },

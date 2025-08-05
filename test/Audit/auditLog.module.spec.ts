@@ -2,14 +2,25 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogModule } from '../../src/audit/auditLog.module';
 import { AuditLogService } from '../../src/audit/auditLog.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PrismaService } from '../../prisma/prisma.service';
 
 describe('AuditLogModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
+    const mockPrismaService = {
+      auditLog: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+      },
+    };
+
     module = await Test.createTestingModule({
-      imports: [AuditLogModule, PrismaModule],
-    }).compile();
+      imports: [AuditLogModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue(mockPrismaService)
+      .compile();
   });
 
   afterEach(async () => {

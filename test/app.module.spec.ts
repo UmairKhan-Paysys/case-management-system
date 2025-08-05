@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtStrategy } from '../src/auth/jwt.strategy';
 
 describe('AppModule', () => {
   beforeAll(() => {
@@ -14,6 +15,10 @@ describe('AppModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
+    const mockJwtStrategy = {
+      validate: jest.fn(),
+    };
+
     module = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -22,6 +27,8 @@ describe('AppModule', () => {
         $connect: jest.fn(),
         $disconnect: jest.fn(),
       })
+      .overrideProvider(JwtStrategy)
+      .useValue(mockJwtStrategy)
       .compile();
   });
 

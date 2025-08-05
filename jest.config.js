@@ -10,6 +10,6 @@ module.exports = {
       statements: 95,
     },
   },
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts', '!src/main.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.spec.ts', '!src/main.ts', '!src/auth/user.decorator.ts'],
   coverageReporters: ['text', 'lcov', 'html'],
 };

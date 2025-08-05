@@ -84,6 +84,60 @@ describe('AuthController', () => {
     });
   });
 
+  it('should handle login without expiresIn', async () => {
+    const loginDto = { username: 'testuser', password: 'password123' };
+    const mockToken = 'jwt-token-no-expires';
+
+    authService.login.mockResolvedValue({ token: mockToken }); // no expiresIn property
+    auditLogService.logAction.mockResolvedValue({});
+
+    const result = await controller.login(loginDto);
+
+    expect(authService.login).toHaveBeenCalledWith('testuser', 'password123');
+    expect(result).toEqual({
+      message: 'Login successful',
+      token: mockToken,
+    });
+    // Should not have expiresIn property in response
+    expect(result.expiresIn).toBeUndefined();
+  });
+
+  it('should handle login with null expiresIn', async () => {
+    const loginDto = { username: 'testuser', password: 'password123' };
+    const mockToken = 'jwt-token-null-expires';
+
+    authService.login.mockResolvedValue({ token: mockToken, expiresIn: null });
+    auditLogService.logAction.mockResolvedValue({});
+
+    const result = await controller.login(loginDto);
+
+    expect(authService.login).toHaveBeenCalledWith('testuser', 'password123');
+    expect(result).toEqual({
+      message: 'Login successful',
+      token: mockToken,
+    });
+    // Should not have expiresIn property in response when it's null
+    expect(result.expiresIn).toBeUndefined();
+  });
+
+  it('should handle login with empty string expiresIn', async () => {
+    const loginDto = { username: 'testuser', password: 'password123' };
+    const mockToken = 'jwt-token-empty-expires';
+
+    authService.login.mockResolvedValue({ token: mockToken, expiresIn: '' });
+    auditLogService.logAction.mockResolvedValue({});
+
+    const result = await controller.login(loginDto);
+
+    expect(authService.login).toHaveBeenCalledWith('testuser', 'password123');
+    expect(result).toEqual({
+      message: 'Login successful',
+      token: mockToken,
+    });
+    // Should not have expiresIn property in response when it's empty string
+    expect(result.expiresIn).toBeUndefined();
+  });
+
   describe('getMe', () => {
     it('should return user information', () => {
       const mockUser = {

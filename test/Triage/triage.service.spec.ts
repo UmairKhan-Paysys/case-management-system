@@ -10,6 +10,7 @@ import {
   Logger,
   NotFoundException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { UpdateAlertDto } from 'src/triage/dto/update-alert.dto';
 // Suppress Logger.error output during tests
@@ -122,6 +123,101 @@ describe('TriageService', () => {
     });
   });
 
+  describe('handleNewAlert error handling', () => {
+    const userId = 'test-user-id';
+    const tenantId = 'test-tenant-id';
+
+    it('should throw BadRequestException if transaction object is missing', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          // transaction is missing
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        } as any,
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Transaction object is missing in alert payload');
+    });
+
+    it('should throw BadRequestException if tenantId is missing in transaction', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          transaction: { txTp: 'PAYMENT' }, // tenantId missing
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        },
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Missing or malformed tenantId in transaction object');
+    });
+
+    it('should throw BadRequestException if tenantId is not a string', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          transaction: { tenantId: 123, txTp: 'PAYMENT' }, // tenantId not string
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        },
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Missing or malformed tenantId in transaction object');
+    });
+
+    it('should throw BadRequestException if tenantId does not match JWT tenantId', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          transaction: { tenantId: 'other-tenant', txTp: 'PAYMENT' },
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        },
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Tenant ID mismatch between transaction and JWT token');
+    });
+
+    it('should throw BadRequestException if txTp is missing in transaction', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          transaction: { tenantId: tenantId }, // txTp missing
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        },
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Missing or malformed txTp in transaction object');
+    });
+
+    it('should throw BadRequestException if txTp is not a string', async () => {
+      const dto: SubmitAlertDto = {
+        result: {
+          message: 'Test alert',
+          report: { test: 'data' },
+          transaction: { tenantId: tenantId, txTp: 123 }, // txTp not string
+          networkMap: { test: 'network' },
+          source: 'test-source',
+        },
+      };
+      await expect(
+        service.handleNewAlert(dto, userId, tenantId),
+      ).rejects.toThrow('Missing or malformed txTp in transaction object');
+    });
+  });
+
   describe('updateAlertData', () => {
     const alertId = 'alert-123';
     const userId = 'test-user-id';
@@ -170,12 +266,138 @@ describe('TriageService', () => {
       expect(result).toEqual(updatedAlert);
     });
 
+    it('should update alert with only confidence_per', async () => {
+      const updateDtoOnlyConfidence: UpdateAlertDto = {
+        confidence_per: 75,
+        // priority is undefined
+      };
+      const updatedAlert = {
+        ...mockExistingAlert,
+        confidence_per: 75,
+      };
+
+      prismaService.alert.findUnique.mockResolvedValue(mockExistingAlert);
+      prismaService.alert.update.mockResolvedValue(updatedAlert);
+
+      const result = await service.updateAlertData(
+        alertId,
+        updateDtoOnlyConfidence,
+        userId,
+        'tenant-123',
+      );
+
+      expect(prismaService.alert.findUnique).toHaveBeenCalled();
+      expect(prismaService.alert.update).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalledWith({
+        userId,
+        operation: 'ALERT_UPDATED',
+        entityName: 'Alert',
+        actionPerformed: 'Updated alert alert-123, confidence_per=75',
+        outcome: 'SUCCESS',
+      });
+      expect(result).toEqual(updatedAlert);
+    });
+
+    it('should update alert with only priority', async () => {
+      const updateDtoOnlyPriority: UpdateAlertDto = {
+        // confidence_per is undefined
+        priority: Priority.MEDIUM,
+      };
+      const updatedAlert = {
+        ...mockExistingAlert,
+        priority: Priority.MEDIUM,
+      };
+
+      prismaService.alert.findUnique.mockResolvedValue(mockExistingAlert);
+      prismaService.alert.update.mockResolvedValue(updatedAlert);
+
+      const result = await service.updateAlertData(
+        alertId,
+        updateDtoOnlyPriority,
+        userId,
+        'tenant-123',
+      );
+
+      expect(prismaService.alert.findUnique).toHaveBeenCalled();
+      expect(prismaService.alert.update).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalledWith({
+        userId,
+        operation: 'ALERT_UPDATED',
+        entityName: 'Alert',
+        actionPerformed: 'Updated alert alert-123, priority=MEDIUM',
+        outcome: 'SUCCESS',
+      });
+      expect(result).toEqual(updatedAlert);
+    });
+
+    it('should update alert with neither confidence_per nor priority', async () => {
+      const updateDtoEmpty: UpdateAlertDto = {
+        // both confidence_per and priority are undefined
+      };
+      const updatedAlert = {
+        ...mockExistingAlert,
+      };
+
+      prismaService.alert.findUnique.mockResolvedValue(mockExistingAlert);
+      prismaService.alert.update.mockResolvedValue(updatedAlert);
+
+      const result = await service.updateAlertData(
+        alertId,
+        updateDtoEmpty,
+        userId,
+        'tenant-123',
+      );
+
+      expect(prismaService.alert.findUnique).toHaveBeenCalled();
+      expect(prismaService.alert.update).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalledWith({
+        userId,
+        operation: 'ALERT_UPDATED',
+        entityName: 'Alert',
+        actionPerformed: 'Updated alert alert-123',
+        outcome: 'SUCCESS',
+      });
+      expect(result).toEqual(updatedAlert);
+    });
+
     it('should throw NotFoundException when alert not found', async () => {
       prismaService.alert.findUnique.mockResolvedValue(null);
 
       await expect(
         service.updateAlertData(alertId, mockUpdateDto, userId, 'tenant-123'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updateAlertData error handling', () => {
+    const alertId = 'alert-123';
+    const userId = 'test-user-id';
+    const mockUpdateDto: UpdateAlertDto = {
+      confidence_per: 85,
+      priority: Priority.HIGH,
+    };
+    const mockExistingAlert = {
+      alert_id: alertId,
+      tenant_id: 'test-tenant-id',
+      priority: Priority.LOW,
+      source: 'test-source',
+      txtp: null,
+      message: 'Test alert message',
+      alert_data: { test: 'report data' },
+      transaction: { test: 'transaction data' },
+      network_map: { test: 'network data' },
+      confidence_per: 0,
+      alert_status: AlertStatus.NEW,
+      case_id: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    it('should throw InternalServerErrorException on DB error', async () => {
+      prismaService.alert.findUnique.mockResolvedValue(mockExistingAlert);
+      prismaService.alert.update.mockRejectedValue(new Error('DB error'));
+      await expect(
+        service.updateAlertData(alertId, mockUpdateDto, userId, 'tenant-123'),
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 
@@ -229,6 +451,35 @@ describe('TriageService', () => {
       await expect(
         service.manualCloseAlert(alertId, status, userId, 'tenant-123'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('manualCloseAlert error handling', () => {
+    const alertId = 'alert-123';
+    const userId = 'test-user-id';
+    const status = AlertStatus.AUTOCLOSED_CONFIRMED;
+    const mockExistingAlert = {
+      alert_id: alertId,
+      tenant_id: 'test-tenant-id',
+      priority: Priority.LOW,
+      source: 'test-source',
+      txtp: null,
+      message: 'Test alert message',
+      alert_data: { test: 'report data' },
+      transaction: { test: 'transaction data' },
+      network_map: { test: 'network data' },
+      confidence_per: 0,
+      alert_status: AlertStatus.NEW,
+      case_id: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    it('should throw InternalServerErrorException on DB error', async () => {
+      prismaService.alert.findUnique.mockResolvedValue(mockExistingAlert);
+      prismaService.alert.update.mockRejectedValue(new Error('DB error'));
+      await expect(
+        service.manualCloseAlert(alertId, status, userId, 'tenant-123'),
+      ).rejects.toThrow(InternalServerErrorException);
     });
   });
 

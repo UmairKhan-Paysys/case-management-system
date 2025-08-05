@@ -279,6 +279,19 @@ describe('AuthService', () => {
     it('should return true if token is invalid', () => {
       expect(service.isTokenExpired('invalid.token')).toBe(true);
     });
+
+    it('should return true if jwt.decode throws an error', () => {
+      // Mock jwt.decode to throw an error
+      const originalDecode = require('jsonwebtoken').decode;
+      require('jsonwebtoken').decode = jest.fn().mockImplementation(() => {
+        throw new Error('Decode error');
+      });
+
+      expect(service.isTokenExpired('any.token')).toBe(true);
+
+      // Restore original function
+      require('jsonwebtoken').decode = originalDecode;
+    });
   });
 
   describe('getTokenTimeToExpiry', () => {
@@ -308,6 +321,19 @@ describe('AuthService', () => {
 
     it('should return 0 if token is invalid', () => {
       expect(service.getTokenTimeToExpiry('invalid.token')).toBe(0);
+    });
+
+    it('should return 0 if jwt.decode throws an error', () => {
+      // Mock jwt.decode to throw an error
+      const originalDecode = require('jsonwebtoken').decode;
+      require('jsonwebtoken').decode = jest.fn().mockImplementation(() => {
+        throw new Error('Decode error');
+      });
+
+      expect(service.getTokenTimeToExpiry('any.token')).toBe(0);
+
+      // Restore original function
+      require('jsonwebtoken').decode = originalDecode;
     });
   });
 });

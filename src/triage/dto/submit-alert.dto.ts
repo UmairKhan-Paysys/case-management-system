@@ -1,8 +1,8 @@
-import { IsString, IsObject, ValidateNested } from 'class-validator';
+import { IsString, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Prisma } from '@prisma/client';
 
-class AlertResultDto {
+export class AlertResultDto {
   @IsString()
   message: string;
 
@@ -16,12 +16,14 @@ class AlertResultDto {
   networkMap: Prisma.JsonObject;
 
   @IsString()
-  source: string; // <-- Added for alert source
+  source: string;
+
+  @IsString()
+  txtp: string; // <-- Add this line
 }
 
 export class SubmitAlertDto {
   @IsObject()
-  @ValidateNested()
   @Type(() => AlertResultDto)
   result: AlertResultDto;
 }

@@ -26,18 +26,33 @@ export class NatsStartupService implements OnModuleInit {
     const alertDto = plainToInstance(AlertMessageDto, req);
     const errors = await validate(alertDto);
 
-    if (errors.length > 0) {
+    // Extract tenantId and txTp from the transaction object
+    const transaction = alertDto.transaction as any;
+    const tenantId = transaction?.tenantId;
+    const txTp = transaction?.TxTp;
+
+    // Validate presence and format
+    if (
+      errors.length > 0 ||
+      !tenantId ||
+      typeof tenantId !== 'string' ||
+      !txTp ||
+      typeof txTp !== 'string'
+    ) {
       this.logger.error('Invalid alert message received', {
         validationErrors: errors.map((e) => ({
           property: e.property,
           constraints: e.constraints,
         })),
+
+        missingFields: {
+          tenantId: !tenantId,
+          txTp: !txTp,
+        },
         originalPayload: req,
       });
       return;
     }
-
-    const tenantId = req?.tenantId ?? 'default';
 
     try {
       const submitAlertDto: SubmitAlertDto = {
@@ -47,14 +62,14 @@ export class NatsStartupService implements OnModuleInit {
           transaction: alertDto.transaction,
           networkMap: alertDto.network_map,
           source: alertDto.source ?? '',
-          txtp: alertDto.txtp ?? '',
+          txtp: txTp,
         },
       };
 
       await this.triageService.handleNewAlert(submitAlertDto, 'nats', tenantId);
       this.logger.log(`Alert ingested from NATS for tenant: ${tenantId}`);
     } catch (err) {
-      this.logger.error(' Failed to persist alert', {
+      this.logger.error('Failed to persist alert', {
         error: err instanceof Error ? err.message : err,
         tenantId,
         alertData: alertDto,

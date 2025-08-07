@@ -84,6 +84,27 @@ describe('AuthController', () => {
     });
   });
 
+  it('should include expiresIn in response when provided by auth service', async () => {
+    const loginDto = { username: 'testuser', password: 'password123' };
+    const mockToken = 'jwt-token-with-expiry';
+    const mockExpiresIn = 3600;
+
+    authService.login.mockResolvedValue({
+      token: mockToken,
+      expiresIn: mockExpiresIn,
+    });
+    auditLogService.logAction.mockResolvedValue({});
+
+    const result = await controller.login(loginDto);
+
+    expect(authService.login).toHaveBeenCalledWith('testuser', 'password123');
+    expect(result).toEqual({
+      message: 'Login successful',
+      token: mockToken,
+      expiresIn: mockExpiresIn,
+    });
+  });
+
   describe('getMe', () => {
     it('should return user information', () => {
       const mockUser = {

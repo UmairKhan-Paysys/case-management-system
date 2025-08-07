@@ -7,7 +7,7 @@ import { RolesGuard } from '../../src/auth/roles.guard';
 import { SubmitAlertDto } from '../../src/triage/dto/submit-alert.dto';
 import { UpdateAlertDto } from '../../src/triage/dto/update-alert.dto';
 import { AutoCloseAlertDto } from '../../src/triage/dto/auto-close-alert.dto';
-import { AlertStatus, Priority } from '@prisma/client';
+import { AlertStatus, Priority, CaseType } from '@prisma/client';
 
 describe('TriageController', () => {
   let controller: TriageController;
@@ -17,6 +17,7 @@ describe('TriageController', () => {
     handleNewAlert: jest.fn(),
     updateAlertData: jest.fn(),
     manualCloseAlert: jest.fn(),
+    investigateAlert: jest.fn(),
   };
 
   const mockAuditLogService = {
@@ -70,6 +71,7 @@ describe('TriageController', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 'test-source',
+        txtp: 'test-txtp',
       },
     };
 
@@ -99,7 +101,26 @@ describe('TriageController', () => {
         created_at: new Date(),
         updated_at: new Date(),
       };
+
+      const mockInvestigateResult = {
+        alert_id: 'alert-123',
+        tenant_id: 'test-tenant-id',
+        priority: Priority.LOW,
+        source: 'test-source',
+        txtp: null,
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 0,
+        alert_status: AlertStatus.SENT_FOR_INVESTIGATION,
+        case_id: 'case-123',
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
       triageService.handleNewAlert.mockResolvedValue(expectedResult);
+      triageService.investigateAlert.mockResolvedValue(mockInvestigateResult);
 
       const result = await controller.submitAlert(
         mockSubmitAlertDto,
@@ -156,6 +177,103 @@ describe('TriageController', () => {
         'test-user-id',
         'test-tenant-id',
       );
+    });
+
+    // Add CONFIDENCE_THRESHOLD tests for submitAlert method
+    describe('CONFIDENCE_THRESHOLD logic in submitAlert', () => {
+      const originalEnv = process.env.CONFIDENCE_THRESHOLD;
+
+      afterEach(() => {
+        process.env.CONFIDENCE_THRESHOLD = originalEnv;
+      });
+
+      it('should create case when CONFIDENCE_THRESHOLD is invalid', async () => {
+        delete process.env.CONFIDENCE_THRESHOLD;
+
+        const expectedAlert = {
+          alert_id: 'alert-456',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: 'test-source',
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 0,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        const mockCase = {
+          alert_id: 'alert-456',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: 'test-source',
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 0,
+          alert_status: AlertStatus.SENT_FOR_INVESTIGATION,
+          case_id: 'case-123',
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(expectedAlert);
+        triageService.investigateAlert.mockResolvedValue(mockCase);
+
+        await controller.submitAlert(mockSubmitAlertDto, mockRequest);
+
+        expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+          mockSubmitAlertDto,
+          'test-user-id',
+          'test-tenant-id',
+        );
+        expect(triageService.investigateAlert).toHaveBeenCalledWith(
+          'alert-456',
+          CaseType.FRAUD,
+          'test-user-id',
+          'test-tenant-id',
+        );
+      });
+
+      it('should not create case when CONFIDENCE_THRESHOLD is valid', async () => {
+        process.env.CONFIDENCE_THRESHOLD = '75';
+
+        const expectedAlert = {
+          alert_id: 'alert-456',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: 'test-source',
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 0,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(expectedAlert);
+
+        await controller.submitAlert(mockSubmitAlertDto, mockRequest);
+
+        expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+          mockSubmitAlertDto,
+          'test-user-id',
+          'test-tenant-id',
+        );
+        // Should NOT call investigateAlert when CONFIDENCE_THRESHOLD is valid
+        expect(triageService.investigateAlert).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -332,173 +450,524 @@ describe('TriageController', () => {
     });
   });
 
-  describe('console.log branch coverage', () => {
-    it('should log user.role when available', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test',
-          report: { test: 'data' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: 'test-source',
-        },
+  describe('ingestAlert', () => {
+    it('should ingest alert successfully', async () => {
+      const alertDto = {
+        tenant_id: 'test-tenant-id',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        source: 'test-source',
+        txtp: 'test-txtp',
+        confidence_per: 85,
       };
 
       const req = {
         user: {
-          user_id: 'user-123',
-          tenantId: 'tenant-456',
-          role: 'test-role', // role is available
-          permissions: 'test-permissions',
+          tenantId: 'test-tenant-id',
         },
       };
 
-      mockTriageService.handleNewAlert.mockResolvedValue({
+      const expectedAlert = {
         alert_id: 'alert-123',
-        message: 'Alert created',
-      });
+        tenant_id: 'test-tenant-id',
+        priority: Priority.LOW,
+        source: 'test-source',
+        txtp: 'test-txtp',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        alert_status: AlertStatus.NEW,
+        case_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
 
-      await controller.submitAlert(dto, req);
+      triageService.handleNewAlert.mockResolvedValue(expectedAlert);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'JWT permissions/roles:',
-        'test-role',
+      const result = await controller.ingestAlert(alertDto, req);
+
+      expect(result).toEqual({ status: 'success' });
+      expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+        {
+          result: {
+            message: alertDto.message,
+            report: alertDto.alert_data,
+            transaction: alertDto.transaction,
+            networkMap: alertDto.network_map,
+            source: alertDto.source,
+            txtp: alertDto.txtp,
+          },
+        },
+        'http',
+        'test-tenant-id',
       );
-      expect(mockTriageService.handleNewAlert).toHaveBeenCalledWith(
-        dto,
-        'user-123',
-        'tenant-456',
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it('should log user.permissions when role is not available', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test',
-          report: { test: 'data' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: 'test-source',
-        },
+    it('should handle error during alert ingestion', async () => {
+      const alertDto = {
+        tenant_id: 'test-tenant-id',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        source: 'test-source',
+        txtp: 'test-txtp',
+        confidence_per: 85,
       };
 
       const req = {
         user: {
-          user_id: 'user-123',
-          tenantId: 'tenant-456',
-          role: null, // role is null, should fallback to permissions
-          permissions: 'test-permissions',
+          tenantId: 'test-tenant-id',
         },
       };
 
-      mockTriageService.handleNewAlert.mockResolvedValue({
-        alert_id: 'alert-123',
-        message: 'Alert created',
+      triageService.handleNewAlert.mockRejectedValue(
+        new Error('Database error'),
+      );
+
+      const result = await controller.ingestAlert(alertDto, req);
+
+      expect(result).toEqual({
+        status: 'error',
+        message: 'Failed to persist alert',
       });
-
-      await controller.submitAlert(dto, req);
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'JWT permissions/roles:',
-        'test-permissions',
-      );
-      expect(mockTriageService.handleNewAlert).toHaveBeenCalledWith(
-        dto,
-        'user-123',
-        'tenant-456',
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it('should log user.permissions when role is undefined', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test',
-          report: { test: 'data' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: 'test-source',
-        },
+    it('should use default tenant when user tenantId is not available', async () => {
+      const alertDto = {
+        tenant_id: 'test-tenant-id',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        source: 'test-source',
+        txtp: 'test-txtp',
+        confidence_per: 85,
       };
 
-      const req = {
-        user: {
-          user_id: 'user-123',
-          tenantId: 'tenant-456',
-          // role is undefined, should fallback to permissions
-          permissions: 'test-permissions',
-        },
-      };
+      const req = {}; // No user object
 
-      mockTriageService.handleNewAlert.mockResolvedValue({
+      const expectedAlert = {
         alert_id: 'alert-123',
-        message: 'Alert created',
-      });
+        tenant_id: 'default',
+        priority: Priority.LOW,
+        source: 'test-source',
+        txtp: 'test-txtp',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        alert_status: AlertStatus.NEW,
+        case_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
 
-      await controller.submitAlert(dto, req);
+      triageService.handleNewAlert.mockResolvedValue(expectedAlert);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'JWT permissions/roles:',
-        'test-permissions',
+      const result = await controller.ingestAlert(alertDto, req);
+
+      expect(result).toEqual({ status: 'success' });
+      expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+        expect.any(Object),
+        'http',
+        'default', // Should use default tenant
       );
-      expect(mockTriageService.handleNewAlert).toHaveBeenCalledWith(
-        dto,
-        'user-123',
-        'tenant-456',
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it('should log user.permissions when role is empty string', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test',
-          report: { test: 'data' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: 'test-source',
-        },
+    it('should handle alert with missing optional fields (source and txtp)', async () => {
+      const alertDto = {
+        tenant_id: 'test-tenant-id',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        // source and txtp are missing
       };
 
       const req = {
         user: {
-          user_id: 'user-123',
-          tenantId: 'tenant-456',
-          role: '', // empty string, should fallback to permissions
-          permissions: 'test-permissions',
+          tenantId: 'test-tenant-id',
         },
       };
 
-      mockTriageService.handleNewAlert.mockResolvedValue({
+      const expectedAlert = {
         alert_id: 'alert-123',
-        message: 'Alert created',
+        tenant_id: 'test-tenant-id',
+        priority: Priority.LOW,
+        source: '',
+        txtp: '',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        alert_status: AlertStatus.NEW,
+        case_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      triageService.handleNewAlert.mockResolvedValue(expectedAlert);
+
+      const result = await controller.ingestAlert(alertDto, req);
+
+      expect(result).toEqual({ status: 'success' });
+      expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          result: expect.objectContaining({
+            source: '', // Should default to empty string
+            txtp: '', // Should default to empty string
+          }),
+        }),
+        'http',
+        'test-tenant-id',
+      );
+    });
+
+    it('should handle alert with null optional fields', async () => {
+      const alertDto = {
+        tenant_id: 'test-tenant-id',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        source: undefined,
+        txtp: undefined,
+      };
+
+      const req = {
+        user: {
+          tenantId: 'test-tenant-id',
+        },
+      };
+
+      const expectedAlert = {
+        alert_id: 'alert-123',
+        tenant_id: 'test-tenant-id',
+        priority: Priority.LOW,
+        source: '',
+        txtp: '',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        alert_status: AlertStatus.NEW,
+        case_id: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      triageService.handleNewAlert.mockResolvedValue(expectedAlert);
+
+      const result = await controller.ingestAlert(alertDto, req);
+
+      expect(result).toEqual({ status: 'success' });
+      expect(triageService.handleNewAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          result: expect.objectContaining({
+            source: '', // Should default to empty string
+            txtp: '', // Should default to empty string
+          }),
+        }),
+        'http',
+        'test-tenant-id',
+      );
+    });
+
+    describe('CONFIDENCE_THRESHOLD environment variable tests', () => {
+      const originalEnv = process.env.CONFIDENCE_THRESHOLD;
+
+      afterEach(() => {
+        process.env.CONFIDENCE_THRESHOLD = originalEnv;
       });
 
-      await controller.submitAlert(dto, req);
+      it('should handle undefined CONFIDENCE_THRESHOLD', async () => {
+        delete process.env.CONFIDENCE_THRESHOLD;
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'JWT permissions/roles:',
-        'test-permissions',
-      );
-      expect(mockTriageService.handleNewAlert).toHaveBeenCalledWith(
-        dto,
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+      });
+
+      it('should handle null CONFIDENCE_THRESHOLD', async () => {
+        process.env.CONFIDENCE_THRESHOLD = null as any;
+
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+      });
+
+      it('should handle empty string CONFIDENCE_THRESHOLD', async () => {
+        process.env.CONFIDENCE_THRESHOLD = '';
+
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+      });
+
+      it('should handle whitespace-only CONFIDENCE_THRESHOLD', async () => {
+        process.env.CONFIDENCE_THRESHOLD = '   ';
+
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+      });
+
+      it('should handle non-numeric CONFIDENCE_THRESHOLD', async () => {
+        process.env.CONFIDENCE_THRESHOLD = 'not-a-number';
+
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+      });
+
+      it('should handle valid numeric CONFIDENCE_THRESHOLD', async () => {
+        process.env.CONFIDENCE_THRESHOLD = '80';
+
+        const alertDto = {
+          tenant_id: 'test-tenant-id',
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+        };
+
+        const req = { user: { tenantId: 'test-tenant-id' } };
+
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'test-tenant-id',
+          priority: Priority.LOW,
+          source: null,
+          txtp: null,
+          message: 'Test alert message',
+          alert_data: { test: 'report data' },
+          transaction: { test: 'transaction data' },
+          network_map: { test: 'network data' },
+          confidence_per: 85,
+          alert_status: AlertStatus.NEW,
+          case_id: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        };
+
+        triageService.handleNewAlert.mockResolvedValue(mockAlert);
+
+        const result = await controller.ingestAlert(alertDto, req);
+
+        expect(result).toEqual({ status: 'success' });
+        // Verify that investigateAlert was NOT called since CONFIDENCE_THRESHOLD is valid
+        expect(triageService.investigateAlert).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('getTest', () => {
+    it('should return ok status', () => {
+      const result = controller.getTest();
+      expect(result).toEqual({ status: 'ok' });
+    });
+  });
+
+  describe('sendForInvestigation', () => {
+    it('should send alert for investigation', async () => {
+      const alertId = 'alert-123';
+      const dto = { caseType: CaseType.FRAUD };
+      const req = {
+        user: {
+          user_id: 'user-123',
+          tenantId: 'tenant-456',
+        },
+      };
+
+      const expectedResult = {
+        alert_id: 'alert-123',
+        tenant_id: 'tenant-456',
+        priority: Priority.HIGH,
+        source: 'test-source',
+        txtp: 'test-txtp',
+        message: 'Test alert message',
+        alert_data: { test: 'report data' },
+        transaction: { test: 'transaction data' },
+        network_map: { test: 'network data' },
+        confidence_per: 85,
+        alert_status: AlertStatus.SENT_FOR_INVESTIGATION,
+        case_id: 'case-123',
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      triageService.investigateAlert.mockResolvedValue(expectedResult);
+
+      const result = await controller.sendForInvestigation(alertId, dto, req);
+
+      expect(result).toEqual(expectedResult);
+      expect(triageService.investigateAlert).toHaveBeenCalledWith(
+        alertId,
+        dto.caseType,
         'user-123',
         'tenant-456',
       );
-
-      consoleSpy.mockRestore();
     });
   });
 });

@@ -16,6 +16,7 @@ describe('SubmitAlertDto', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 'test-source',
+        txtp: 'test-txtp',
       },
     };
 
@@ -25,6 +26,7 @@ describe('SubmitAlertDto', () => {
     expect(errors).toHaveLength(0);
     expect(dto.result.message).toBe('Test alert message');
     expect(dto.result.source).toBe('test-source');
+    expect(dto.result.txtp).toBe('test-txtp');
     expect(dto.result.report).toEqual({ test: 'report data' });
     expect(dto.result.transaction).toEqual({ test: 'transaction data' });
     expect(dto.result.networkMap).toEqual({ test: 'network data' });
@@ -48,6 +50,7 @@ describe('SubmitAlertDto', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 'test-source',
+        txtp: 'test-txtp',
       },
     };
 
@@ -67,6 +70,7 @@ describe('SubmitAlertDto', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 123,
+        txtp: 'test-txtp',
       },
     };
 
@@ -86,6 +90,7 @@ describe('SubmitAlertDto', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 'test-source',
+        txtp: 'test-txtp',
       },
     };
 
@@ -120,6 +125,7 @@ describe('SubmitAlertDto', () => {
           edges: [{ from: 'node1', to: 'node2' }],
         },
         source: 'fraud-detection-engine',
+        txtp: 'test-txtp',
       },
     };
 

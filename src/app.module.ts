@@ -8,7 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { TriageModule } from './triage/triage.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { TokenExpiryInterceptor } from './auth/token-expiry.interceptor';
-import { NatsStartupService } from './nats/nats.startup';
+// import { NatsStartupService } from './nats/nats.startup';
 
 @Module({
   imports: [
@@ -22,7 +22,7 @@ import { NatsStartupService } from './nats/nats.startup';
     AuthModule,
   ],
   providers: [
-    NatsStartupService,
+    // NatsStartupService,
     PrismaService,
     {
       provide: APP_INTERCEPTOR,

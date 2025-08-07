@@ -309,5 +309,56 @@ describe('AuthService', () => {
     it('should return 0 if token is invalid', () => {
       expect(service.getTokenTimeToExpiry('invalid.token')).toBe(0);
     });
+
+    it('should return 0 when jwt.decode throws an error', () => {
+      // Mock jwt to throw an error
+      jest.doMock('jsonwebtoken', () => ({
+        decode: jest.fn().mockImplementation(() => {
+          throw new Error('Invalid token format');
+        }),
+      }));
+
+      expect(service.getTokenTimeToExpiry('any.token.here')).toBe(0);
+    });
+  });
+
+  describe('isTokenExpired error handling', () => {
+    it('should return true when jwt.decode throws an error', () => {
+      // Test with completely malformed token that will cause jwt.decode to throw
+      // This is a string that's not even close to a valid JWT format
+      expect(service.isTokenExpired('not-a-jwt-at-all')).toBe(true);
+    });
+
+    it('should handle jwt.decode errors and return true', () => {
+      // This should trigger the catch block in isTokenExpired
+      const result = service.isTokenExpired('malformed.jwt.token');
+      expect(result).toBe(true);
+    });
+
+    it('should handle jwt.decode errors for null token', () => {
+      // This should trigger the catch block
+      const result = service.isTokenExpired(null as any);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getTokenTimeToExpiry error handling', () => {
+    it('should return 0 when jwt.decode throws an error', () => {
+      // This should trigger the catch block in getTokenTimeToExpiry
+      const result = service.getTokenTimeToExpiry('malformed.jwt.token');
+      expect(result).toBe(0);
+    });
+
+    it('should handle jwt.decode errors for null token', () => {
+      // This should trigger the catch block
+      const result = service.getTokenTimeToExpiry(null as any);
+      expect(result).toBe(0);
+    });
+
+    it('should handle jwt.decode errors for undefined token', () => {
+      // This should trigger the catch block
+      const result = service.getTokenTimeToExpiry(undefined as any);
+      expect(result).toBe(0);
+    });
   });
 });

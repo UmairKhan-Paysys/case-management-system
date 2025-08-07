@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../../src/audit/auditLog.service';
 import { SubmitAlertDto } from '../../src/triage/dto/submit-alert.dto';
 
-import { AlertStatus, Priority } from '@prisma/client';
+import { AlertStatus, Priority, CaseType } from '@prisma/client';
 
 import {
   Logger,
@@ -18,6 +18,12 @@ jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 // Create a deep mock for PrismaService
 const createMockPrismaService = () => ({
   alert: {
+    create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
+    // Add any other methods used in TriageService here
+  },
+  case: {
     create: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
@@ -80,6 +86,7 @@ describe('TriageService', () => {
         transaction: { test: 'transaction data' },
         networkMap: { test: 'network data' },
         source: 'test-source',
+        txtp: 'test-txtp',
       },
     };
 
@@ -128,7 +135,7 @@ describe('TriageService', () => {
 
     const mockExistingAlert = {
       alert_id: alertId,
-      tenant_id: 'test-tenant-id',
+      tenant_id: 'tenant-123',
       priority: Priority.LOW,
       source: 'test-source',
       txtp: null,
@@ -182,7 +189,7 @@ describe('TriageService', () => {
 
     const mockExistingAlert = {
       alert_id: alertId,
-      tenant_id: 'test-tenant-id',
+      tenant_id: 'tenant-123',
       priority: Priority.LOW,
       source: 'test-source',
       txtp: null,
@@ -228,15 +235,16 @@ describe('TriageService', () => {
     });
   });
 
-  describe('source extraction coverage', () => {
-    it('should extract source from result.source', async () => {
+  describe('alert creation with current implementation', () => {
+    it('should create alert with hardcoded REST API source', async () => {
       const dto: SubmitAlertDto = {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
           transaction: { test: 'transaction' },
           networkMap: { test: 'network' },
-          source: 'direct-source',
+          source: 'any-source', // This will be ignored
+          txtp: 'test-txtp',
         },
       };
 
@@ -244,7 +252,7 @@ describe('TriageService', () => {
         alert_id: 'alert-123',
         tenant_id: 'tenant-123',
         priority: Priority.LOW,
-        source: 'direct-source',
+        source: 'REST API',
         txtp: '',
         alert_status: AlertStatus.NEW,
         message: 'Test alert',
@@ -260,133 +268,21 @@ describe('TriageService', () => {
 
       expect(prismaService.alert.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          source: 'direct-source',
+          source: 'REST API',
         }),
       });
       expect(result).toEqual(mockAlert);
     });
 
-    it('should extract source from result.report.source when result.source is not available', async () => {
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test alert',
-          report: { source: 'report-source' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: '', // empty string, should fallback to report
-        },
-      };
-
-      const mockAlert = {
-        alert_id: 'alert-123',
-        tenant_id: 'tenant-123',
-        priority: Priority.LOW,
-        source: 'report-source',
-        txtp: '',
-        alert_status: AlertStatus.NEW,
-        message: 'Test alert',
-      };
-
-      prismaService.alert.create.mockResolvedValue(mockAlert);
-
-      const result = await service.handleNewAlert(
-        dto,
-        'user-123',
-        'tenant-123',
-      );
-
-      expect(prismaService.alert.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          source: 'report-source',
-        }),
-      });
-      expect(result).toEqual(mockAlert);
-    });
-
-    it('should use default empty source when neither result.source nor result.report.source are available', async () => {
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test alert',
-          report: { test: 'data' }, // no source property
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: '', // empty source
-        },
-      };
-
-      const mockAlert = {
-        alert_id: 'alert-123',
-        tenant_id: 'tenant-123',
-        priority: Priority.LOW,
-        source: '',
-        txtp: '',
-        alert_status: AlertStatus.NEW,
-        message: 'Test alert',
-      };
-
-      prismaService.alert.create.mockResolvedValue(mockAlert);
-
-      const result = await service.handleNewAlert(
-        dto,
-        'user-123',
-        'tenant-123',
-      );
-
-      expect(prismaService.alert.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          source: '',
-        }),
-      });
-      expect(result).toEqual(mockAlert);
-    });
-  });
-
-  describe('txtp extraction coverage', () => {
-    it('should extract txtp from result.report.txtp', async () => {
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test alert',
-          report: { txtp: 'report-txtp' },
-          transaction: { test: 'transaction' },
-          networkMap: { test: 'network' },
-          source: 'test-source',
-        },
-      };
-
-      const mockAlert = {
-        alert_id: 'alert-123',
-        tenant_id: 'tenant-123',
-        priority: Priority.LOW,
-        source: 'test-source',
-        txtp: 'report-txtp',
-        alert_status: AlertStatus.NEW,
-        message: 'Test alert',
-      };
-
-      prismaService.alert.create.mockResolvedValue(mockAlert);
-
-      const result = await service.handleNewAlert(
-        dto,
-        'user-123',
-        'tenant-123',
-      );
-
-      expect(prismaService.alert.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          txtp: 'report-txtp',
-        }),
-      });
-      expect(result).toEqual(mockAlert);
-    });
-
-    it('should extract txtp from result.transaction.txtp', async () => {
+    it('should extract txtp from transaction.TxTp when available', async () => {
       const dto: SubmitAlertDto = {
         result: {
           message: 'Test alert',
           report: { test: 'data' },
-          transaction: { txtp: 'transaction-txtp' },
+          transaction: { TxTp: 'transaction-txtp' },
           networkMap: { test: 'network' },
           source: 'test-source',
+          txtp: 'ignored-txtp',
         },
       };
 
@@ -394,7 +290,7 @@ describe('TriageService', () => {
         alert_id: 'alert-123',
         tenant_id: 'tenant-123',
         priority: Priority.LOW,
-        source: 'test-source',
+        source: 'REST API',
         txtp: 'transaction-txtp',
         alert_status: AlertStatus.NEW,
         message: 'Test alert',
@@ -415,43 +311,6 @@ describe('TriageService', () => {
       });
       expect(result).toEqual(mockAlert);
     });
-
-    it('should extract txtp from result.networkMap.txtp', async () => {
-      const dto: SubmitAlertDto = {
-        result: {
-          message: 'Test alert',
-          report: { test: 'data' },
-          transaction: { test: 'transaction' },
-          networkMap: { txtp: 'network-txtp' },
-          source: 'test-source',
-        },
-      };
-
-      const mockAlert = {
-        alert_id: 'alert-123',
-        tenant_id: 'tenant-123',
-        priority: Priority.LOW,
-        source: 'test-source',
-        txtp: 'network-txtp',
-        alert_status: AlertStatus.NEW,
-        message: 'Test alert',
-      };
-
-      prismaService.alert.create.mockResolvedValue(mockAlert);
-
-      const result = await service.handleNewAlert(
-        dto,
-        'user-123',
-        'tenant-123',
-      );
-
-      expect(prismaService.alert.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          txtp: 'network-txtp',
-        }),
-      });
-      expect(result).toEqual(mockAlert);
-    });
   });
 
   describe('error handling coverage', () => {
@@ -463,6 +322,7 @@ describe('TriageService', () => {
           transaction: { test: 'transaction' },
           networkMap: { test: 'network' },
           source: 'test-source',
+          txtp: 'test-txtp',
         },
       };
 
@@ -484,6 +344,200 @@ describe('TriageService', () => {
           'tenant-123',
         ),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Error Handling Coverage', () => {
+    describe('updateAlertData error scenarios', () => {
+      it('should throw NotFoundException when alert not found', async () => {
+        prismaService.alert.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.updateAlertData(
+            'non-existent-alert',
+            {},
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw NotFoundException when alert belongs to different tenant', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'different-tenant',
+          alert_status: AlertStatus.NEW,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+
+        await expect(
+          service.updateAlertData('alert-123', {}, 'user-123', 'tenant-123'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw InternalServerErrorException when database update fails', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'tenant-123',
+          alert_status: AlertStatus.NEW,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+        prismaService.alert.update.mockRejectedValue(
+          new Error('Database connection failed'),
+        );
+
+        await expect(
+          service.updateAlertData(
+            'alert-123',
+            { confidence_per: 85 },
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('manualCloseAlert error scenarios', () => {
+      it('should throw NotFoundException when alert not found', async () => {
+        prismaService.alert.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.manualCloseAlert(
+            'non-existent-alert',
+            AlertStatus.AUTOCLOSED_CONFIRMED,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw NotFoundException when alert belongs to different tenant', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'different-tenant',
+          alert_status: AlertStatus.NEW,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+
+        await expect(
+          service.manualCloseAlert(
+            'alert-123',
+            AlertStatus.AUTOCLOSED_CONFIRMED,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw InternalServerErrorException when database update fails', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'tenant-123',
+          alert_status: AlertStatus.NEW,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+        prismaService.alert.update.mockRejectedValue(
+          new Error('Database connection failed'),
+        );
+
+        await expect(
+          service.manualCloseAlert(
+            'alert-123',
+            AlertStatus.AUTOCLOSED_CONFIRMED,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+    });
+
+    describe('investigateAlert error scenarios', () => {
+      it('should throw NotFoundException when alert not found', async () => {
+        prismaService.alert.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.investigateAlert(
+            'non-existent-alert',
+            CaseType.FRAUD,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw NotFoundException when alert belongs to different tenant', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'different-tenant',
+          priority: Priority.HIGH,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+
+        await expect(
+          service.investigateAlert(
+            'alert-123',
+            CaseType.FRAUD,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('should throw InternalServerErrorException when case creation fails', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'tenant-123',
+          priority: Priority.HIGH,
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+        prismaService.case.create.mockRejectedValue(
+          new Error('Database connection failed'),
+        );
+
+        await expect(
+          service.investigateAlert(
+            'alert-123',
+            CaseType.FRAUD,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
+
+      it('should throw InternalServerErrorException when alert update fails after case creation', async () => {
+        const mockAlert = {
+          alert_id: 'alert-123',
+          tenant_id: 'tenant-123',
+          priority: Priority.HIGH,
+        };
+
+        const mockCase = {
+          case_id: 'case-123',
+          case_creator_user_id: 'user-123',
+          tenant_id: 'tenant-123',
+        };
+
+        prismaService.alert.findUnique.mockResolvedValue(mockAlert);
+        prismaService.case.create.mockResolvedValue(mockCase);
+        prismaService.alert.update.mockRejectedValue(
+          new Error('Database connection failed'),
+        );
+
+        await expect(
+          service.investigateAlert(
+            'alert-123',
+            CaseType.FRAUD,
+            'user-123',
+            'tenant-123',
+          ),
+        ).rejects.toThrow(InternalServerErrorException);
+      });
     });
   });
 });

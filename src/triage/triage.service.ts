@@ -27,7 +27,7 @@ export class TriageService {
 
   async handleNewAlert(dto: SubmitAlertDto, userId: string, tenantId: string) {
     // Determine the alert source
-    let source = 'REST API';
+    const source = 'REST API';
     // Determine the alert type (txtp)
     const txtp =
       typeof dto?.result?.transaction?.TxTp === 'string'

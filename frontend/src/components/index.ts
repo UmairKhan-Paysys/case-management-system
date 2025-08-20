@@ -4,6 +4,7 @@ export { default as Navbar } from './layout/Navbar';
 // Common components
 export { default as Card } from './common/Card';
 export { default as AlertsTable } from './common/AlertsTable';
+export { default as AlertsDetail } from './common/AlertsDetail';
 export { default as AlertsSearchWithFilters } from './common/AlertsSearchWithFilters';
 
 // Types

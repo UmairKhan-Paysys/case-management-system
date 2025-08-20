@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertsSearchWithFilters, AlertsTable, Navbar } from '../components';
+import { AlertsSearchWithFilters, AlertsTable, Navbar, AlertsDetail } from '../components';
 import type { 
   Alert, 
   AlertsSearchFilters, 
@@ -11,6 +11,9 @@ const AlertsDashboard: React.FC<AlertsDashboardProps> = ({ onBack }) => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Alerts detail modal state
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -464,6 +467,22 @@ const AlertsDashboard: React.FC<AlertsDashboardProps> = ({ onBack }) => {
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedAlerts = filteredAlerts.slice(startIndex, startIndex + pageSize);
 
+  // Actions handlers for modal
+  const handleConvertToCase = (alert: Alert) => {
+    // Placeholder: convert alert to a case (would call API in real app)
+    console.log('Converting alert to case:', alert.id);
+    // For demo, remove the alert from list and close modal
+    setFilteredAlerts(prev => prev.filter(a => a.id !== alert.id));
+    setSelectedAlert(null);
+  };
+
+  const handleCloseAlert = (alert: Alert) => {
+    // Placeholder: mark alert as closed (would call API in real app)
+    console.log('Closing alert:', alert.id);
+    setFilteredAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, status: 'resolved' } : a));
+    setSelectedAlert(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
@@ -512,7 +531,37 @@ const AlertsDashboard: React.FC<AlertsDashboardProps> = ({ onBack }) => {
           sortColumn={sortColumn}
           sortDirection={sortDirection}
           rowKey="id"
+          onRowClick={(row) => setSelectedAlert(row)} 
         />
+        {selectedAlert && (
+          <div
+            className="fixed inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-50"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Alert details"
+            onClick={(e) => {
+              // close when clicking on the backdrop (but not when clicking the modal)
+              if (e.target === e.currentTarget) setSelectedAlert(null);
+            }}
+          >
+            <div className="bg-white rounded-xl shadow-lg max-w-3xl w-full p-6 relative transition transform ease-out duration-150">
+              {/* Close button */}
+              <button
+                onClick={() => setSelectedAlert(null)}
+                className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+              >
+                ✕
+              </button>
+
+              {/* Inject details component */}
+              <AlertsDetail
+                alert={selectedAlert}
+                onConvertToCase={handleConvertToCase}
+                onCloseAlert={handleCloseAlert}
+              />
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

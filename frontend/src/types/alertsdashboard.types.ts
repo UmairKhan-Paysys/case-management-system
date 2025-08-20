@@ -84,6 +84,8 @@ export interface AlertsTableProps<T> {
   selectedRows?: Set<string | number>;
   onSelectionChange?: (selectedRows: Set<string | number>) => void;
   rowKey?: keyof T | ((row: T) => string | number);
+  // Optional handler when a row is clicked (or activated via keyboard)
+  onRowClick?: (row: T) => void;
 }
 
 export interface AlertsDashboardProps {

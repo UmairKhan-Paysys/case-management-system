@@ -19,8 +19,11 @@ const AlertsTable = <T extends Record<string, unknown>>({
   selectable = false,
   selectedRows = new Set(),
   onSelectionChange,
+  onRowClick,
   rowKey = 'id' as keyof T
-}: AlertsTableProps<T>) => {
+}: 
+AlertsTableProps<T>) => {
+  
   const [showActions, setShowActions] = useState<string | null>(null);
 
   const getRowKey = (row: T, index: number): string | number => {
@@ -174,6 +177,17 @@ const AlertsTable = <T extends Record<string, unknown>>({
                   <tr 
                     key={String(key)}
                     className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}
+                    onClick={() => onRowClick && onRowClick(row)}
+                    role={onRowClick ? 'button' : undefined}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onKeyDown={(e) => {
+                      if (!onRowClick) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }}
+                    style={{ cursor: onRowClick ? 'pointer' : undefined }}
                   >
                     {/* Selection Cell */}
                     {selectable && (

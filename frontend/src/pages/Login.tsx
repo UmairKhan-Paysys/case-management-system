@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
-import { EyeIcon, EyeSlashIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import {
+  EyeIcon,
+  EyeSlashIcon,
+  LockClosedIcon,
+} from '@heroicons/react/24/outline';
 import type { LoginCredentials } from '../types/auth.types';
 
 interface LoginProps {
@@ -17,9 +21,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setCredentials(prev => ({
+    setCredentials((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
     // Clear error when user starts typing
     if (error) setError(null);
@@ -34,9 +38,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       // TODO: Implement actual login logic
       console.log('Login attempt:', credentials);
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Navigate to dashboard on successful login
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Set auth token in localStorage to mark user as authenticated
+      localStorage.setItem('authToken', 'mock-jwt-token');
+
+      // Navigate to alerts dashboard on successful login
       onLoginSuccess();
     } catch {
       setError('Invalid username or password. Please try again.');
@@ -50,7 +57,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '' }}>
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: '' }}
+    >
       <div className="max-w-md w-full mx-4">
         {/* Logo and Title */}
         <div className="text-center mb-8">
@@ -136,12 +146,18 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     type="checkbox"
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                  <label
+                    htmlFor="remember-me"
+                    className="ml-2 block text-sm text-gray-700"
+                  >
                     Remember me
                   </label>
                 </div>
 
-                <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
+                <a
+                  href="#"
+                  className="text-sm text-blue-600 hover:text-blue-500"
+                >
                   Forgot password?
                 </a>
               </div>
@@ -149,7 +165,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || !credentials.username || !credentials.password}
+                disabled={
+                  loading || !credentials.username || !credentials.password
+                }
                 className="btn btn-primary btn-lg w-full"
               >
                 {loading ? (
@@ -167,9 +185,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            © 2025. All rights reserved.
-          </p>
+          <p className="text-gray-500 text-sm">© 2025. All rights reserved.</p>
         </div>
       </div>
     </div>

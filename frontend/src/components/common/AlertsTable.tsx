@@ -1,17 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  ChevronUpIcon, 
-  ChevronDownIcon, 
-  EllipsisHorizontalIcon
-} from '@heroicons/react/24/outline';
-import type { AlertsTableColumn, AlertsTableAction, AlertsTableProps } from '../../types/alertsdashboard.types';
+import React from 'react';
+import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import type {
+  AlertsTableColumn,
+  AlertsTableProps,
+} from '../../types/alertsdashboard.types';
 
 const AlertsTable = <T extends Record<string, unknown>>({
   data,
   columns,
   actions,
   loading = false,
-  emptyMessage = "No data available",
+  emptyMessage = 'No data available',
   pagination,
   onSort,
   sortColumn,
@@ -19,34 +18,34 @@ const AlertsTable = <T extends Record<string, unknown>>({
   selectable = false,
   selectedRows = new Set(),
   onSelectionChange,
+  rowKey = 'id' as keyof T,
   onRowClick,
-  rowKey = 'id' as keyof T
-}: 
-AlertsTableProps<T>) => {
-  
-  const [showActions, setShowActions] = useState<string | null>(null);
-
+}: AlertsTableProps<T>) => {
   const getRowKey = (row: T, index: number): string | number => {
     if (typeof rowKey === 'function') {
       return rowKey(row);
     }
     const value = row[rowKey];
-    return (typeof value === 'string' || typeof value === 'number') ? value : index;
+    return typeof value === 'string' || typeof value === 'number'
+      ? value
+      : index;
   };
 
   const handleSort = (column: keyof T | string) => {
     if (!onSort) return;
-    
-    const newDirection = 
+
+    const newDirection =
       sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc';
     onSort(column, newDirection);
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (!onSelectionChange) return;
-    
+
     if (checked) {
-      const allRowKeys = new Set(data.map((row, index) => getRowKey(row, index)));
+      const allRowKeys = new Set(
+        data.map((row, index) => getRowKey(row, index)),
+      );
       onSelectionChange(allRowKeys);
     } else {
       onSelectionChange(new Set());
@@ -55,7 +54,7 @@ AlertsTableProps<T>) => {
 
   const handleRowSelect = (rowKey: string | number, checked: boolean) => {
     if (!onSelectionChange) return;
-    
+
     const newSelection = new Set(selectedRows);
     if (checked) {
       newSelection.add(rowKey);
@@ -66,9 +65,13 @@ AlertsTableProps<T>) => {
   };
 
   const isAllSelected = data.length > 0 && selectedRows.size === data.length;
-  const isPartiallySelected = selectedRows.size > 0 && selectedRows.size < data.length;
+  const isPartiallySelected =
+    selectedRows.size > 0 && selectedRows.size < data.length;
 
-  const renderCellContent = (column: AlertsTableColumn<T>, row: T): React.ReactNode => {
+  const renderCellContent = (
+    column: AlertsTableColumn<T>,
+    row: T,
+  ): React.ReactNode => {
     if (column.render) {
       return column.render(row[column.key as keyof T], row);
     }
@@ -83,19 +86,11 @@ AlertsTableProps<T>) => {
     if (!column.sortable || sortColumn !== column.key) {
       return null;
     }
-    return sortDirection === 'asc' ? 
-      <ChevronUpIcon className="h-4 w-4" /> : 
-      <ChevronDownIcon className="h-4 w-4" />;
-  };
-
-  const getActionColor = (color: string = 'gray') => {
-    const colors = {
-      blue: 'text-blue-600 hover:text-blue-800',
-      green: 'text-green-600 hover:text-green-800',
-      red: 'text-red-600 hover:text-red-800',
-      gray: 'text-gray-600 hover:text-gray-800'
-    };
-    return colors[color as keyof typeof colors] || colors.gray;
+    return sortDirection === 'asc' ? (
+      <ChevronUpIcon className="h-4 w-4" />
+    ) : (
+      <ChevronDownIcon className="h-4 w-4" />
+    );
   };
 
   return (
@@ -135,8 +130,11 @@ AlertsTableProps<T>) => {
                 <th
                   key={String(column.key)}
                   className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    column.align === 'center' ? 'text-center' : 
-                    column.align === 'right' ? 'text-right' : 'text-left'
+                    column.align === 'center'
+                      ? 'text-center'
+                      : column.align === 'right'
+                        ? 'text-right'
+                        : 'text-left'
                   } ${column.sortable ? 'cursor-pointer hover:bg-gray-100' : ''}`}
                   style={{ width: column.width }}
                   onClick={() => column.sortable && handleSort(column.key)}
@@ -147,13 +145,6 @@ AlertsTableProps<T>) => {
                   </div>
                 </th>
               ))}
-
-              {/* Actions Header */}
-              {actions && actions.length > 0 && (
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              )}
             </tr>
           </thead>
 
@@ -161,8 +152,10 @@ AlertsTableProps<T>) => {
           <tbody className="bg-white divide-y divide-gray-200">
             {data.length === 0 ? (
               <tr>
-                <td 
-                  colSpan={columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)}
+                <td
+                  colSpan={
+                    columns.length + (selectable ? 1 : 0) + (actions ? 1 : 0)
+                  }
                   className="px-6 py-12 text-center text-gray-500"
                 >
                   {emptyMessage}
@@ -172,30 +165,25 @@ AlertsTableProps<T>) => {
               data.map((row, index) => {
                 const key = getRowKey(row, index);
                 const isSelected = selectedRows.has(key);
-                
+
                 return (
-                  <tr 
+                  <tr
                     key={String(key)}
-                    className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}
+                    className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''} ${onRowClick ? 'cursor-pointer' : ''}`}
                     onClick={() => onRowClick && onRowClick(row)}
-                    role={onRowClick ? 'button' : undefined}
-                    tabIndex={onRowClick ? 0 : undefined}
-                    onKeyDown={(e) => {
-                      if (!onRowClick) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onRowClick(row);
-                      }
-                    }}
-                    style={{ cursor: onRowClick ? 'pointer' : undefined }}
                   >
                     {/* Selection Cell */}
                     {selectable && (
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td
+                        className="px-6 py-4 whitespace-nowrap"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={(e) => handleRowSelect(key, e.target.checked)}
+                          onChange={(e) =>
+                            handleRowSelect(key, e.target.checked)
+                          }
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                       </td>
@@ -206,49 +194,16 @@ AlertsTableProps<T>) => {
                       <td
                         key={String(column.key)}
                         className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                          column.align === 'center' ? 'text-center' : 
-                          column.align === 'right' ? 'text-right' : 'text-left'
+                          column.align === 'center'
+                            ? 'text-center'
+                            : column.align === 'right'
+                              ? 'text-right'
+                              : 'text-left'
                         }`}
                       >
                         {renderCellContent(column, row)}
                       </td>
                     ))}
-
-                    {/* Actions Cell */}
-                    {actions && actions.length > 0 && (
-                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                        <div className="relative inline-block">
-                          <button
-                            onClick={() => setShowActions(showActions === String(key) ? null : String(key))}
-                            className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-full p-1"
-                          >
-                            <EllipsisHorizontalIcon className="h-5 w-5" />
-                          </button>
-
-                          {/* Actions Dropdown */}
-                          {showActions === String(key) && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-20 border border-gray-200">
-                              <div className="py-1">
-                                {actions.map((action: AlertsTableAction<T>, actionIndex: number) => (
-                                  <button
-                                    key={actionIndex}
-                                    onClick={() => {
-                                      action.onClick(row);
-                                      setShowActions(null);
-                                    }}
-                                    disabled={action.disabled?.(row)}
-                                    className={`flex items-center space-x-2 w-full px-4 py-2 text-sm text-left hover:bg-gray-100 focus:outline-none focus:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ${getActionColor(action.color)}`}
-                                  >
-                                    {action.icon && <action.icon className="h-4 w-4" />}
-                                    <span>{action.label}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    )}
                   </tr>
                 );
               })
@@ -265,44 +220,60 @@ AlertsTableProps<T>) => {
               <p className="text-sm text-gray-700">
                 Showing{' '}
                 <span className="font-medium">
-                  {Math.min((pagination.currentPage - 1) * pagination.pageSize + 1, pagination.totalItems)}
+                  {Math.min(
+                    (pagination.currentPage - 1) * pagination.pageSize + 1,
+                    pagination.totalItems,
+                  )}
                 </span>{' '}
                 to{' '}
                 <span className="font-medium">
-                  {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)}
+                  {Math.min(
+                    pagination.currentPage * pagination.pageSize,
+                    pagination.totalItems,
+                  )}
                 </span>{' '}
-                of{' '}
-                <span className="font-medium">{pagination.totalItems}</span> results
+                of <span className="font-medium">{pagination.totalItems}</span>{' '}
+                results
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <nav
+                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                aria-label="Pagination"
+              >
                 <button
-                  onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
+                  onClick={() =>
+                    pagination.onPageChange(pagination.currentPage - 1)
+                  }
                   disabled={pagination.currentPage <= 1}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
                 {/* Page Numbers */}
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  const pageNumber = i + 1;
-                  return (
-                    <button
-                      key={pageNumber}
-                      onClick={() => pagination.onPageChange(pageNumber)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        pagination.currentPage === pageNumber
-                          ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      {pageNumber}
-                    </button>
-                  );
-                })}
+                {Array.from(
+                  { length: Math.min(5, pagination.totalPages) },
+                  (_, i) => {
+                    const pageNumber = i + 1;
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => pagination.onPageChange(pageNumber)}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          pagination.currentPage === pageNumber
+                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNumber}
+                      </button>
+                    );
+                  },
+                )}
                 <button
-                  onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
+                  onClick={() =>
+                    pagination.onPageChange(pagination.currentPage + 1)
+                  }
                   disabled={pagination.currentPage >= pagination.totalPages}
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

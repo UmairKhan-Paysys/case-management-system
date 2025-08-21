@@ -320,10 +320,30 @@ const AlertsDetailModal: React.FC<AlertsDetailModalProps> = ({
                     </h4>
                     <div className="space-y-4">
                       <p className="text-sm font-medium text-gray-900">
-                        Related Item 1
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            console.log('Related Item 1 clicked', alert?.id);
+                            // TODO: navigate to related item or open details panel
+                          }}
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          Related Item 1
+                        </a>
                       </p>
                       <p className="text-sm font-medium text-gray-900">
-                        Related Item 2
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            console.log('Related Item 2 clicked', alert?.id);
+                            // TODO: navigate to related item or open details panel
+                          }}
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          Related Item 2
+                        </a>
                       </p>
                     </div>
                   </div>

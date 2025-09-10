@@ -20,6 +20,7 @@ export class CaseService {
 
       const createdCase = await this.prismaService.case.create({
         data: {
+          parent_id: createCaseDTO.parentId ?? null,
           tenant_id: createCaseDTO.tenantId,
           case_creator_user_id: createCaseDTO.caseCreatorUserId,
           case_owner_user_id: createCaseDTO.caseOwnerUserId,
